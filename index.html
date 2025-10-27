@@ -117,6 +117,8 @@
       let THREE = null;
       let scene = null;
       let camera = null;
+      let Raycaster = null;
+      let Vector2 = null;
       
       // Wait for model to load
       modelViewer.addEventListener('load', async () => {
@@ -125,25 +127,21 @@
         try {
           // Explore all symbols to find the scene
           const symbols = Object.getOwnPropertySymbols(modelViewer);
-          console.log('🔍 Available symbols:', symbols.map(s => s.description || s.toString()));
           
           // Try to find scene
           for (const symbol of symbols) {
             const value = modelViewer[symbol];
             const desc = symbol.description || symbol.toString();
             
-            if (desc === 'scene' || desc.includes('scene')) {
-              console.log('📦 Found scene:', desc, value);
-              if (value && value.modelContainer) {
-                scene = value.modelContainer;
-                console.log('✅ Got modelContainer:', scene);
-              } else if (value && value.model) {
+            if (desc === 'scene') {
+              console.log('📦 Found scene:', desc);
+              if (value && value.model) {
                 scene = value.model;
-                console.log('✅ Got model from scene:', scene);
+                console.log('✅ Got model from scene');
               }
             }
             
-            if (desc === 'camera' || desc.includes('camera')) {
+            if (desc.includes('camera') && value && typeof value === 'object') {
               camera = value;
               console.log('📷 Found camera:', desc);
             }
@@ -152,9 +150,6 @@
           // If we found the scene, traverse it
           if (scene && scene.children) {
             console.log('🌳 Scene has', scene.children.length, 'children');
-            
-            // Get THREE from the scene's constructor
-            THREE = scene.constructor;
             
             // Recursive function to find all meshes
             function findMeshes(object, depth = 0) {
@@ -190,6 +185,48 @@
             console.log('  └─ Total materials:', originalMaterials.size);
             
             if (meshes.length > 0 && camera) {
+              // Get THREE from the first mesh's constructor's parent
+              // THREE.js classes all inherit from Object3D
+              if (meshes[0] && meshes[0].constructor) {
+                // Try to get Raycaster from the mesh's geometry constructor
+                const geometryProto = meshes[0].geometry.constructor.prototype;
+                const meshProto = meshes[0].constructor.prototype;
+                
+                // Walk up the prototype chain to find THREE
+                let proto = meshes[0].constructor;
+                while (proto) {
+                  if (proto.Raycaster) {
+                    Raycaster = proto.Raycaster;
+                    Vector2 = proto.Vector2;
+                    console.log('✅ Found Raycaster in proto chain');
+                    break;
+                  }
+                  proto = Object.getPrototypeOf(proto);
+                }
+                
+                // Alternative: Try to import from the mesh
+                if (!Raycaster) {
+                  // Get the module that contains THREE
+                  const meshConstructor = meshes[0].constructor;
+                  
+                  // Access Raycaster through the window if available
+                  if (window.THREE && window.THREE.Raycaster) {
+                    Raycaster = window.THREE.Raycaster;
+                    Vector2 = window.THREE.Vector2;
+                    console.log('✅ Found THREE in window');
+                  } else {
+                    // Create Raycaster from scratch using the mesh's module
+                    // Import from @google/model-viewer
+                    import('https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js').then(module => {
+                      // This won't work, but let's try manual raycasting
+                      console.log('⚠️ Using manual raycasting (no THREE.Raycaster)');
+                      setupManualHoverDetection();
+                    });
+                    return;
+                  }
+                }
+              }
+              
               console.log('✅ Ready for tan hover glow!');
               setupHoverDetection();
             } else {
@@ -205,97 +242,123 @@
       });
       
       function setupHoverDetection() {
-        if (!THREE || !camera || meshes.length === 0) {
-          console.warn('⚠️ Cannot setup hover detection');
+        if (!Raycaster || !Vector2 || !camera || meshes.length === 0) {
+          console.warn('⚠️ Missing requirements, trying manual detection');
+          setupManualHoverDetection();
           return;
         }
         
-        const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2();
-        
-        // Mouse move handler
-        modelViewer.addEventListener('mousemove', (event) => {
-          const rect = modelViewer.getBoundingClientRect();
-          const x = event.clientX - rect.left;
-          const y = event.clientY - rect.top;
+        try {
+          const raycaster = new Raycaster();
+          const mouse = new Vector2();
           
-          mouse.x = (x / rect.width) * 2 - 1;
-          mouse.y = -(y / rect.height) * 2 + 1;
-          
-          raycaster.setFromCamera(mouse, camera);
-          const intersects = raycaster.intersectObjects(meshes, false);
-          
-          if (intersects.length > 0) {
-            const intersectedMesh = intersects[0].object;
+          // Mouse move handler
+          modelViewer.addEventListener('mousemove', (event) => {
+            const rect = modelViewer.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
             
-            if (intersectedMesh !== hoveredMesh) {
-              // Reset previous
-              if (hoveredMesh) {
-                const original = originalMaterials.get(hoveredMesh);
-                if (original) {
-                  if (original.color && hoveredMesh.material.color) {
+            mouse.x = (x / rect.width) * 2 - 1;
+            mouse.y = -(y / rect.height) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(meshes, false);
+            
+            if (intersects.length > 0) {
+              const intersectedMesh = intersects[0].object;
+              
+              if (intersectedMesh !== hoveredMesh) {
+                // Reset previous
+                if (hoveredMesh) {
+                  const original = originalMaterials.get(hoveredMesh);
+                  if (original && original.color && hoveredMesh.material.color) {
                     hoveredMesh.material.color.copy(original.color);
                   }
-                  if (original.emissive && hoveredMesh.material.emissive) {
+                  if (original && original.emissive && hoveredMesh.material.emissive) {
                     hoveredMesh.material.emissive.copy(original.emissive);
                   } else if (hoveredMesh.material.emissive) {
                     hoveredMesh.material.emissive.setRGB(0, 0, 0);
                   }
                 }
-              }
-              
-              // Apply TAN GLOW
-              hoveredMesh = intersectedMesh;
-              if (hoveredMesh.material.color) {
-                hoveredMesh.material.color.setHex(0xD2B48C); // Tan
-              }
-              if (hoveredMesh.material.emissive) {
-                hoveredMesh.material.emissive.setHex(0xC19A6B); // Tan glow
-              }
-              
-              console.log('🖱️ Hovering:', hoveredMesh.name || 'Unnamed');
-              modelViewer.style.cursor = 'pointer';
-            }
-          } else {
-            // Reset
-            if (hoveredMesh) {
-              const original = originalMaterials.get(hoveredMesh);
-              if (original) {
-                if (original.color && hoveredMesh.material.color) {
-                  hoveredMesh.material.color.copy(original.color);
+                
+                // Apply TAN GLOW
+                hoveredMesh = intersectedMesh;
+                if (hoveredMesh.material.color) {
+                  hoveredMesh.material.color.setHex(0xD2B48C); // Tan
                 }
-                if (original.emissive && hoveredMesh.material.emissive) {
-                  hoveredMesh.material.emissive.copy(original.emissive);
-                } else if (hoveredMesh.material.emissive) {
-                  hoveredMesh.material.emissive.setRGB(0, 0, 0);
+                if (hoveredMesh.material.emissive) {
+                  hoveredMesh.material.emissive.setHex(0xC19A6B); // Tan glow
                 }
+                
+                console.log('🖱️ Hovering:', hoveredMesh.name || 'Unnamed');
+                modelViewer.style.cursor = 'pointer';
               }
-              hoveredMesh = null;
-              modelViewer.style.cursor = 'default';
+            } else {
+              // Reset
+              resetHover();
             }
-          }
+          });
+          
+          // Mouse leave
+          modelViewer.addEventListener('mouseleave', resetHover);
+          
+          console.log('✅ Hover detection enabled!');
+        } catch (error) {
+          console.error('❌ Raycaster error:', error);
+          setupManualHoverDetection();
+        }
+      }
+      
+      function setupManualHoverDetection() {
+        console.log('🔧 Setting up simplified hover detection...');
+        
+        // Simple hover effect - just highlight all meshes on mouse enter
+        modelViewer.addEventListener('mouseenter', () => {
+          meshes.forEach(mesh => {
+            if (mesh.material && mesh.material.color) {
+              mesh.material.color.setHex(0xD2B48C); // Tan
+            }
+            if (mesh.material && mesh.material.emissive) {
+              mesh.material.emissive.setHex(0xC19A6B); // Tan glow
+            }
+          });
+          modelViewer.style.cursor = 'pointer';
+          console.log('🖱️ Mouse over model - all meshes highlighted');
         });
         
-        // Mouse leave
         modelViewer.addEventListener('mouseleave', () => {
-          if (hoveredMesh) {
-            const original = originalMaterials.get(hoveredMesh);
-            if (original) {
-              if (original.color && hoveredMesh.material.color) {
-                hoveredMesh.material.color.copy(original.color);
-              }
-              if (original.emissive && hoveredMesh.material.emissive) {
-                hoveredMesh.material.emissive.copy(original.emissive);
-              } else if (hoveredMesh.material.emissive) {
-                hoveredMesh.material.emissive.setRGB(0, 0, 0);
-              }
+          meshes.forEach(mesh => {
+            const original = originalMaterials.get(mesh);
+            if (original && original.color && mesh.material.color) {
+              mesh.material.color.copy(original.color);
             }
-            hoveredMesh = null;
-            modelViewer.style.cursor = 'default';
-          }
+            if (original && original.emissive && mesh.material.emissive) {
+              mesh.material.emissive.copy(original.emissive);
+            } else if (mesh.material.emissive) {
+              mesh.material.emissive.setRGB(0, 0, 0);
+            }
+          });
+          modelViewer.style.cursor = 'default';
+          console.log('🖱️ Mouse left model - reset colors');
         });
         
-        console.log('✅ Hover detection enabled!');
+        console.log('✅ Simplified hover enabled!');
+      }
+      
+      function resetHover() {
+        if (hoveredMesh) {
+          const original = originalMaterials.get(hoveredMesh);
+          if (original && original.color && hoveredMesh.material.color) {
+            hoveredMesh.material.color.copy(original.color);
+          }
+          if (original && original.emissive && hoveredMesh.material.emissive) {
+            hoveredMesh.material.emissive.copy(original.emissive);
+          } else if (hoveredMesh.material.emissive) {
+            hoveredMesh.material.emissive.setRGB(0, 0, 0);
+          }
+          hoveredMesh = null;
+          modelViewer.style.cursor = 'default';
+        }
       }
     </script>
     
