@@ -1,4 +1,4 @@
-/* Radial Frosted Center Effect - Clear edges, frosted center */
+/* Radial Frosted Center Effect - Fully transparent edges (internal padding) */
 
 * {
   margin: 0;
@@ -21,33 +21,33 @@ model-viewer {
   position: relative;
 }
 
-/* Frosted Center Effect - Blurred center, clear edges */
+/* Frosted Center Effect - Fully transparent edges, frosted only in center */
 model-viewer::before {
   content: '';
   position: absolute;
-  top: -30%;
-  left: -30%;
-  width: 160%;
-  height: 160%;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
   z-index: -1;
   
-  /* Extended radial gradient - frosted center, transparent edges */
-  /* Gradient fades to transparent well before frame edges */
+  /* Radial gradient - frosted center with 100% transparent padding at edges */
   background: radial-gradient(
     circle at center,
-    rgba(255, 255, 255, 0.3) 0%,
-    rgba(255, 255, 255, 0.2) 15%,
-    rgba(255, 255, 255, 0.1) 25%,
-    rgba(255, 255, 255, 0.05) 35%,
-    rgba(255, 255, 255, 0.02) 45%,
-    rgba(255, 255, 255, 0.005) 55%,
-    transparent 65%
+    rgba(255, 255, 255, 0.35) 0%,
+    rgba(255, 255, 255, 0.25) 15%,
+    rgba(255, 255, 255, 0.15) 30%,
+    rgba(255, 255, 255, 0.08) 45%,
+    rgba(255, 255, 255, 0.03) 55%,
+    rgba(255, 255, 255, 0.01) 65%,
+    transparent 75%,
+    transparent 100%
   );
   
-  /* Increased center blur effect */
-  backdrop-filter: blur(60px) saturate(150%);
-  -webkit-backdrop-filter: blur(60px) saturate(150%);
+  /* Increased blur effect */
+  backdrop-filter: blur(65px) saturate(150%);
+  -webkit-backdrop-filter: blur(65px) saturate(150%);
 }
 
 /* Hotspot Buttons - Minimal Style */
