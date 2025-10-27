@@ -55,9 +55,6 @@
     <!-- Load model-viewer library -->
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
     
-    <!-- Load Three.js separately for raycasting -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.min.js"></script>
-    
     <!-- 3DVista Navigation Script -->
     <script>
       function navigateTo(locationId) {
@@ -111,119 +108,133 @@
     </script>
     
     <!-- Model Inspection & Tan Hover Glow Effect Script -->
-    <script>
+    <script type="module">
       const modelViewer = document.getElementById('buildingViewer');
       
       let hoveredMesh = null;
       let originalMaterials = new Map();
       let meshes = [];
-      let raycaster, mouse;
       
-      // Wait for both model-viewer and THREE.js to be ready
-      async function initHoverEffect() {
-        // Wait for THREE.js to be available
-        while (typeof THREE === 'undefined') {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-        
-        console.log('✅ THREE.js loaded');
-        
-        // Initialize raycaster
-        raycaster = new THREE.Raycaster();
-        mouse = new THREE.Vector2();
-        
-        // Wait for model to load
-        await modelViewer.loaded;
-        
+      // Wait for model to load
+      modelViewer.addEventListener('load', async () => {
         console.log('🏗️ Model loaded! Inspecting structure...');
         
-        const model = modelViewer.model;
-        
-        // Check if model has traverse method
-        if (!model || typeof model.traverse !== 'function') {
-          console.error('❌ Model does not have traverse method');
-          console.log('Model object:', model);
-          return;
-        }
-        
-        console.log('📦 Full Model Object:', model);
-        
-        // Function to recursively print the tree
-        function printTree(object, indent = '', index = 0) {
-          const icon = object.isMesh ? '🔷' : object.isGroup ? '📁' : '📦';
-          console.log(`${indent}${icon} [${index}] ${object.name || 'Unnamed'} (${object.type})`);
+        try {
+          // Get the model
+          const model = await modelViewer.model;
           
-          if (object.isMesh && object.material) {
-            console.log(`${indent}  ├─ Material: ${object.material.name || 'Unnamed'}`);
-            console.log(`${indent}  ├─ Color: ${object.material.color ? '#' + object.material.color.getHexString() : 'N/A'}`);
-            console.log(`${indent}  └─ Geometry: ${object.geometry.type}`);
+          if (!model) {
+            console.error('❌ Model is null');
+            return;
           }
           
-          if (object.children && object.children.length > 0) {
-            object.children.forEach((child, i) => {
-              printTree(child, indent + '  ', i);
-            });
+          console.log('📦 Model Object:', model);
+          
+          // Function to recursively print the tree
+          function printTree(object, indent = '', index = 0) {
+            const icon = object.isMesh ? '🔷' : object.isGroup ? '📁' : '📦';
+            console.log(`${indent}${icon} [${index}] ${object.name || 'Unnamed'} (${object.type})`);
+            
+            if (object.isMesh && object.material) {
+              console.log(`${indent}  ├─ Material: ${object.material.name || 'Unnamed'}`);
+              if (object.material.color) {
+                console.log(`${indent}  ├─ Color: #${object.material.color.getHexString()}`);
+              }
+              console.log(`${indent}  └─ Geometry: ${object.geometry.type}`);
+            }
+            
+            if (object.children && object.children.length > 0) {
+              object.children.forEach((child, i) => {
+                printTree(child, indent + '  ', i);
+              });
+            }
           }
+          
+          console.log('🌳 Scene Tree Structure:');
+          printTree(model);
+          
+          // Traverse the model to find all meshes
+          if (typeof model.traverse === 'function') {
+            model.traverse((node) => {
+              if (node.isMesh && node.material) {
+                meshes.push(node);
+                
+                // Clone the material to avoid shared material issues
+                if (node.material.clone) {
+                  const originalMaterial = node.material;
+                  
+                  // Store original colors
+                  originalMaterials.set(node, {
+                    color: originalMaterial.color ? originalMaterial.color.clone() : null,
+                    emissive: originalMaterial.emissive ? originalMaterial.emissive.clone() : null
+                  });
+                  
+                  console.log('🔷 Mesh found:', {
+                    name: node.name || 'Unnamed',
+                    material: originalMaterial.name || 'Unnamed',
+                    color: originalMaterial.color ? '#' + originalMaterial.color.getHexString() : 'N/A'
+                  });
+                }
+              }
+            });
+            
+            console.log('📊 Summary:');
+            console.log('  ├─ Total meshes:', meshes.length);
+            console.log('  ├─ Total materials:', originalMaterials.size);
+            console.log('  └─ Ready for tan hover glow!');
+            
+            // Setup hover detection
+            setupHoverDetection();
+          } else {
+            console.error('❌ Model does not have traverse method');
+          }
+          
+        } catch (error) {
+          console.error('❌ Error loading model:', error);
         }
-        
-        console.log('🌳 Scene Tree Structure:');
-        printTree(model);
-        
-        // Get all meshes and store their original materials
-        model.traverse((node) => {
-          if (node.isMesh && node.material) {
-            meshes.push(node);
-            
-            // Store original material properties
-            originalMaterials.set(node, {
-              color: node.material.color.clone(),
-              emissive: node.material.emissive ? node.material.emissive.clone() : new THREE.Color(0, 0, 0)
-            });
-            
-            console.log('🔷 Mesh found:', {
-              name: node.name || 'Unnamed',
-              material: node.material.name || 'Unnamed',
-              color: node.material.color ? '#' + node.material.color.getHexString() : 'N/A'
-            });
-          }
-        });
-        
-        console.log('📊 Summary:');
-        console.log('  ├─ Total meshes:', meshes.length);
-        console.log('  ├─ Total materials:', originalMaterials.size);
-        console.log('  └─ Ready for tan hover glow!');
-        
-        // Enable hover detection
-        setupHoverDetection();
-      }
+      });
       
       function setupHoverDetection() {
-        // Get camera from model-viewer
-        const getCamera = () => {
-          const symbols = Object.getOwnPropertySymbols(modelViewer);
-          const cameraSymbol = symbols.find(s => s.description === 'camera');
-          return cameraSymbol ? modelViewer[cameraSymbol] : null;
+        // Use model-viewer's internal scene and camera
+        const getSceneInfo = () => {
+          try {
+            // Access internal properties
+            const symbols = Object.getOwnPropertySymbols(modelViewer);
+            const sceneSymbol = symbols.find(s => s.description === 'scene');
+            const scene = sceneSymbol ? modelViewer[sceneSymbol] : null;
+            
+            if (scene && scene.camera) {
+              return { scene, camera: scene.camera };
+            }
+          } catch (e) {
+            console.warn('Could not access scene:', e);
+          }
+          return null;
         };
         
         // Mouse move handler
         modelViewer.addEventListener('mousemove', (event) => {
+          if (meshes.length === 0) return;
+          
+          const sceneInfo = getSceneInfo();
+          if (!sceneInfo) return;
+          
           const rect = modelViewer.getBoundingClientRect();
           const x = event.clientX - rect.left;
           const y = event.clientY - rect.top;
           
           // Convert to normalized device coordinates
-          mouse.x = (x / rect.width) * 2 - 1;
-          mouse.y = -(y / rect.height) * 2 + 1;
+          const mouseX = (x / rect.width) * 2 - 1;
+          const mouseY = -(y / rect.height) * 2 + 1;
           
-          // Get camera
-          const camera = getCamera();
-          if (!camera) {
-            console.warn('⚠️ Camera not found');
-            return;
-          }
+          // Get THREE from model's constructor
+          const THREE = modelViewer.model.constructor;
           
-          // Perform raycasting
-          raycaster.setFromCamera(mouse, camera);
+          // Create raycaster
+          const raycaster = new THREE.Raycaster();
+          const mouse = new THREE.Vector2(mouseX, mouseY);
+          
+          raycaster.setFromCamera(mouse, sceneInfo.camera);
           const intersects = raycaster.intersectObjects(meshes, false);
           
           if (intersects.length > 0) {
@@ -235,15 +246,21 @@
               if (hoveredMesh) {
                 const original = originalMaterials.get(hoveredMesh);
                 if (original) {
-                  hoveredMesh.material.color.copy(original.color);
-                  hoveredMesh.material.emissive.copy(original.emissive);
+                  if (original.color) hoveredMesh.material.color.copy(original.color);
+                  if (original.emissive) hoveredMesh.material.emissive.copy(original.emissive);
+                  else if (hoveredMesh.material.emissive) hoveredMesh.material.emissive.setRGB(0, 0, 0);
                 }
               }
               
               // Set new hovered mesh with TAN GLOW
               hoveredMesh = intersectedMesh;
-              hoveredMesh.material.color.setHex(0xD2B48C); // Tan color
-              hoveredMesh.material.emissive.setHex(0xC19A6B); // Warm tan glow
+              
+              if (hoveredMesh.material.color) {
+                hoveredMesh.material.color.setHex(0xD2B48C); // Tan color
+              }
+              if (hoveredMesh.material.emissive) {
+                hoveredMesh.material.emissive.setHex(0xC19A6B); // Warm tan glow
+              }
               
               console.log('🖱️ Hovering:', hoveredMesh.name || 'Unnamed mesh');
               modelViewer.style.cursor = 'pointer';
@@ -253,8 +270,9 @@
             if (hoveredMesh) {
               const original = originalMaterials.get(hoveredMesh);
               if (original) {
-                hoveredMesh.material.color.copy(original.color);
-                hoveredMesh.material.emissive.copy(original.emissive);
+                if (original.color) hoveredMesh.material.color.copy(original.color);
+                if (original.emissive) hoveredMesh.material.emissive.copy(original.emissive);
+                else if (hoveredMesh.material.emissive) hoveredMesh.material.emissive.setRGB(0, 0, 0);
               }
               hoveredMesh = null;
               modelViewer.style.cursor = 'default';
@@ -267,8 +285,9 @@
           if (hoveredMesh) {
             const original = originalMaterials.get(hoveredMesh);
             if (original) {
-              hoveredMesh.material.color.copy(original.color);
-              hoveredMesh.material.emissive.copy(original.emissive);
+              if (original.color) hoveredMesh.material.color.copy(original.color);
+              if (original.emissive) hoveredMesh.material.emissive.copy(original.emissive);
+              else if (hoveredMesh.material.emissive) hoveredMesh.material.emissive.setRGB(0, 0, 0);
             }
             hoveredMesh = null;
             modelViewer.style.cursor = 'default';
@@ -277,11 +296,6 @@
         
         console.log('✅ Hover detection enabled!');
       }
-      
-      // Initialize when ready
-      initHoverEffect().catch(err => {
-        console.error('❌ Failed to initialize hover effect:', err);
-      });
     </script>
     
   </body>
