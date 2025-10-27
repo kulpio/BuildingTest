@@ -107,17 +107,18 @@
       console.log('🎬 Ready for 3DVista integration');
     </script>
     
-    <!-- Model Inspection & Tan Hover Glow Effect Script -->
+    <!-- Simple Screen-Based Hover Effect -->
     <script type="module">
       const modelViewer = document.getElementById('buildingViewer');
       
       let hoveredMesh = null;
       let originalMaterials = new Map();
-      let meshes = [];
+      let firstFloor = null;
+      let secondFloor = null;
       
       // Wait for model to load
       modelViewer.addEventListener('load', async () => {
-        console.log('🏗️ Model loaded! Searching for scene...');
+        console.log('🏗️ Model loaded! Finding meshes...');
         
         try {
           // Find scene
@@ -135,18 +136,23 @@
           }
           
           if (scene && scene.children) {
-            // Find all meshes
+            // Find meshes
             function findMeshes(object) {
               if (object.isMesh && object.material) {
-                meshes.push(object);
-                
                 // Store original material
                 originalMaterials.set(object, {
                   color: object.material.color ? object.material.color.clone() : null,
                   emissive: object.material.emissive ? object.material.emissive.clone() : null
                 });
                 
-                console.log('🔷', object.name, '- Position Y:', object.position?.y || 'N/A');
+                // Assign to first or second floor based on name
+                if (object.name && object.name.includes('first')) {
+                  firstFloor = object;
+                  console.log('✅ Found first_floor mesh');
+                } else if (object.name && object.name.includes('second')) {
+                  secondFloor = object;
+                  console.log('✅ Found second_floor mesh');
+                }
               }
               
               if (object.children && object.children.length > 0) {
@@ -156,21 +162,16 @@
             
             findMeshes(scene);
             
-            // Sort meshes by Y position (bottom to top)
-            meshes.sort((a, b) => {
-              const aY = a.position?.y || 0;
-              const bY = b.position?.y || 0;
-              return aY - bY;
+            console.log('📊 Meshes found:', { 
+              firstFloor: firstFloor ? '✓' : '✗', 
+              secondFloor: secondFloor ? '✓' : '✗' 
             });
             
-            console.log('📊 Found', meshes.length, 'meshes (sorted by Y position)');
-            meshes.forEach((m, i) => {
-              console.log(`  [${i}] ${m.name} at Y=${m.position?.y || 'N/A'}`);
-            });
-            
-            if (meshes.length > 0) {
-              console.log('✅ Ready for tan hover glow!');
-              setupHoverDetection();
+            if (firstFloor && secondFloor) {
+              console.log('✅ Ready for simple screen-based hover!');
+              setupSimpleHover();
+            } else {
+              console.warn('⚠️ Could not find both floor meshes');
             }
           }
           
@@ -179,103 +180,52 @@
         }
       });
       
-      function setupHoverDetection() {
-        console.log('🔧 Setting up Y-coordinate based hover detection...');
-        
-        let mouseMoveCount = 0;
+      function setupSimpleHover() {
+        console.log('🔧 Setting up simple screen-based hover...');
+        console.log('   Top half of screen → second_floor');
+        console.log('   Bottom half of screen → first_floor');
         
         // Mouse move handler
         modelViewer.addEventListener('mousemove', (event) => {
-          mouseMoveCount++;
-          
-          // Only log every 20th mousemove to avoid spam
-          const shouldLog = mouseMoveCount % 20 === 0;
-          
           const rect = modelViewer.getBoundingClientRect();
-          const x = event.clientX - rect.left;
           const y = event.clientY - rect.top;
+          const screenPercent = y / rect.height;
           
-          // Convert to normalized coordinates
-          const normalizedX = (x / rect.width) * 2 - 1;
-          const normalizedY = -(y / rect.height) * 2 + 1;
+          // Simple logic: top 50% = second floor, bottom 50% = first floor
+          const targetMesh = screenPercent < 0.5 ? secondFloor : firstFloor;
           
-          if (shouldLog) {
-            console.log('🖱️ Mouse:', { x: normalizedX.toFixed(2), y: normalizedY.toFixed(2) });
-          }
-          
-          // Try to get hit position
-          const hit = modelViewer.positionAndNormalFromPoint(normalizedX, normalizedY);
-          
-          if (hit) {
-            if (shouldLog) {
-              console.log('✨ Hit detected at Y:', hit.position.y.toFixed(3));
-            }
-            
-            // Determine which mesh based on Y coordinate
-            const hitY = hit.position.y;
-            
-            // Simple logic: if Y > 0.5, it's second_floor, else first_floor
-            let targetMesh = null;
-            
-            if (meshes.length === 2) {
-              // Assume meshes[0] is first_floor (lower), meshes[1] is second_floor (higher)
-              const midY = (meshes[0].position.y + meshes[1].position.y) / 2;
-              targetMesh = hitY > midY ? meshes[1] : meshes[0];
-            } else {
-              // Fallback: pick closest mesh by Y
-              let closestDist = Infinity;
-              meshes.forEach(mesh => {
-                const dist = Math.abs(hitY - (mesh.position?.y || 0));
-                if (dist < closestDist) {
-                  closestDist = dist;
-                  targetMesh = mesh;
-                }
-              });
-            }
-            
-            // If we found a mesh and it's different
-            if (targetMesh && targetMesh !== hoveredMesh) {
-              // Reset previous
-              if (hoveredMesh) {
-                resetMesh(hoveredMesh);
-              }
-              
-              // Apply TAN GLOW
-              hoveredMesh = targetMesh;
-              if (hoveredMesh.material.color) {
-                hoveredMesh.material.color.setHex(0xD2B48C); // Tan
-              }
-              if (hoveredMesh.material.emissive) {
-                hoveredMesh.material.emissive.setHex(0xC19A6B); // Tan glow
-              }
-              
-              console.log('✅ Hovering:', hoveredMesh.name);
-              modelViewer.style.cursor = 'pointer';
-            }
-          } else {
-            // No hit - reset
+          // If different from current hover
+          if (targetMesh && targetMesh !== hoveredMesh) {
+            // Reset previous
             if (hoveredMesh) {
-              if (shouldLog) {
-                console.log('❌ No hit - resetting');
-              }
               resetMesh(hoveredMesh);
-              hoveredMesh = null;
-              modelViewer.style.cursor = 'default';
             }
+            
+            // Apply TAN GLOW
+            hoveredMesh = targetMesh;
+            if (hoveredMesh.material.color) {
+              hoveredMesh.material.color.setHex(0xD2B48C); // Tan
+            }
+            if (hoveredMesh.material.emissive) {
+              hoveredMesh.material.emissive.setHex(0xC19A6B); // Tan glow
+            }
+            
+            console.log('✨ Hovering:', hoveredMesh.name, `(screen ${(screenPercent * 100).toFixed(0)}%)`);
+            modelViewer.style.cursor = 'pointer';
           }
         });
         
         // Mouse leave
         modelViewer.addEventListener('mouseleave', () => {
-          console.log('👋 Mouse left viewer');
           if (hoveredMesh) {
+            console.log('👋 Resetting hover');
             resetMesh(hoveredMesh);
             hoveredMesh = null;
             modelViewer.style.cursor = 'default';
           }
         });
         
-        console.log('✅ Hover detection enabled!');
+        console.log('✅ Simple hover enabled!');
       }
       
       function resetMesh(mesh) {
