@@ -114,28 +114,36 @@
       let hoveredMesh = null;
       let originalMaterials = new Map();
       let meshes = [];
+      let THREE = null;
       
       // Wait for model to load
       modelViewer.addEventListener('load', async () => {
         console.log('🏗️ Model loaded! Inspecting structure...');
         
         try {
-          // Get the model
+          // Get THREE.js reference from model
           const model = await modelViewer.model;
-          
-          if (!model) {
-            console.error('❌ Model is null');
-            return;
-          }
+          THREE = model.constructor;
           
           console.log('📦 Model Object:', model);
+          console.log('🔍 Model type:', model.type);
+          console.log('🔍 Model children:', model.children);
           
-          // Function to recursively print the tree
-          function printTree(object, indent = '', index = 0) {
+          // Function to recursively traverse and collect meshes
+          function traverseAndCollect(object, indent = '', index = 0) {
             const icon = object.isMesh ? '🔷' : object.isGroup ? '📁' : '📦';
             console.log(`${indent}${icon} [${index}] ${object.name || 'Unnamed'} (${object.type})`);
             
+            // If it's a mesh, add to our collection
             if (object.isMesh && object.material) {
+              meshes.push(object);
+              
+              // Store original colors
+              originalMaterials.set(object, {
+                color: object.material.color ? object.material.color.clone() : null,
+                emissive: object.material.emissive ? object.material.emissive.clone() : null
+              });
+              
               console.log(`${indent}  ├─ Material: ${object.material.name || 'Unnamed'}`);
               if (object.material.color) {
                 console.log(`${indent}  ├─ Color: #${object.material.color.getHexString()}`);
@@ -143,50 +151,26 @@
               console.log(`${indent}  └─ Geometry: ${object.geometry.type}`);
             }
             
+            // Recursively process children
             if (object.children && object.children.length > 0) {
               object.children.forEach((child, i) => {
-                printTree(child, indent + '  ', i);
+                traverseAndCollect(child, indent + '  ', i);
               });
             }
           }
           
           console.log('🌳 Scene Tree Structure:');
-          printTree(model);
+          traverseAndCollect(model);
           
-          // Traverse the model to find all meshes
-          if (typeof model.traverse === 'function') {
-            model.traverse((node) => {
-              if (node.isMesh && node.material) {
-                meshes.push(node);
-                
-                // Clone the material to avoid shared material issues
-                if (node.material.clone) {
-                  const originalMaterial = node.material;
-                  
-                  // Store original colors
-                  originalMaterials.set(node, {
-                    color: originalMaterial.color ? originalMaterial.color.clone() : null,
-                    emissive: originalMaterial.emissive ? originalMaterial.emissive.clone() : null
-                  });
-                  
-                  console.log('🔷 Mesh found:', {
-                    name: node.name || 'Unnamed',
-                    material: originalMaterial.name || 'Unnamed',
-                    color: originalMaterial.color ? '#' + originalMaterial.color.getHexString() : 'N/A'
-                  });
-                }
-              }
-            });
-            
-            console.log('📊 Summary:');
-            console.log('  ├─ Total meshes:', meshes.length);
-            console.log('  ├─ Total materials:', originalMaterials.size);
+          console.log('📊 Summary:');
+          console.log('  ├─ Total meshes:', meshes.length);
+          console.log('  ├─ Total materials:', originalMaterials.size);
+          
+          if (meshes.length > 0) {
             console.log('  └─ Ready for tan hover glow!');
-            
-            // Setup hover detection
             setupHoverDetection();
           } else {
-            console.error('❌ Model does not have traverse method');
+            console.warn('  └─ No meshes found - hover effect disabled');
           }
           
         } catch (error) {
@@ -195,46 +179,49 @@
       });
       
       function setupHoverDetection() {
-        // Use model-viewer's internal scene and camera
-        const getSceneInfo = () => {
-          try {
-            // Access internal properties
-            const symbols = Object.getOwnPropertySymbols(modelViewer);
-            const sceneSymbol = symbols.find(s => s.description === 'scene');
-            const scene = sceneSymbol ? modelViewer[sceneSymbol] : null;
-            
-            if (scene && scene.camera) {
-              return { scene, camera: scene.camera };
-            }
-          } catch (e) {
-            console.warn('Could not access scene:', e);
+        if (!THREE || meshes.length === 0) {
+          console.warn('⚠️ Cannot setup hover - THREE or meshes not available');
+          return;
+        }
+        
+        // Get camera and scene
+        const getSceneAndCamera = () => {
+          const symbols = Object.getOwnPropertySymbols(modelViewer);
+          
+          // Find the scene symbol
+          const sceneSymbol = symbols.find(s => s.description === 'scene');
+          const scene = sceneSymbol ? modelViewer[sceneSymbol] : null;
+          
+          if (scene && scene.camera) {
+            return { scene, camera: scene.camera };
           }
-          return null;
+          
+          // Fallback: try to get camera directly
+          const cameraSymbol = symbols.find(s => s.description === 'camera');
+          const camera = cameraSymbol ? modelViewer[cameraSymbol] : null;
+          
+          return { scene, camera };
         };
+        
+        // Create raycaster
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
         
         // Mouse move handler
         modelViewer.addEventListener('mousemove', (event) => {
-          if (meshes.length === 0) return;
-          
-          const sceneInfo = getSceneInfo();
-          if (!sceneInfo) return;
+          const { camera } = getSceneAndCamera();
+          if (!camera) return;
           
           const rect = modelViewer.getBoundingClientRect();
           const x = event.clientX - rect.left;
           const y = event.clientY - rect.top;
           
           // Convert to normalized device coordinates
-          const mouseX = (x / rect.width) * 2 - 1;
-          const mouseY = -(y / rect.height) * 2 + 1;
+          mouse.x = (x / rect.width) * 2 - 1;
+          mouse.y = -(y / rect.height) * 2 + 1;
           
-          // Get THREE from model's constructor
-          const THREE = modelViewer.model.constructor;
-          
-          // Create raycaster
-          const raycaster = new THREE.Raycaster();
-          const mouse = new THREE.Vector2(mouseX, mouseY);
-          
-          raycaster.setFromCamera(mouse, sceneInfo.camera);
+          // Perform raycasting
+          raycaster.setFromCamera(mouse, camera);
           const intersects = raycaster.intersectObjects(meshes, false);
           
           if (intersects.length > 0) {
@@ -246,9 +233,14 @@
               if (hoveredMesh) {
                 const original = originalMaterials.get(hoveredMesh);
                 if (original) {
-                  if (original.color) hoveredMesh.material.color.copy(original.color);
-                  if (original.emissive) hoveredMesh.material.emissive.copy(original.emissive);
-                  else if (hoveredMesh.material.emissive) hoveredMesh.material.emissive.setRGB(0, 0, 0);
+                  if (original.color && hoveredMesh.material.color) {
+                    hoveredMesh.material.color.copy(original.color);
+                  }
+                  if (original.emissive && hoveredMesh.material.emissive) {
+                    hoveredMesh.material.emissive.copy(original.emissive);
+                  } else if (hoveredMesh.material.emissive) {
+                    hoveredMesh.material.emissive.setRGB(0, 0, 0);
+                  }
                 }
               }
               
@@ -270,9 +262,14 @@
             if (hoveredMesh) {
               const original = originalMaterials.get(hoveredMesh);
               if (original) {
-                if (original.color) hoveredMesh.material.color.copy(original.color);
-                if (original.emissive) hoveredMesh.material.emissive.copy(original.emissive);
-                else if (hoveredMesh.material.emissive) hoveredMesh.material.emissive.setRGB(0, 0, 0);
+                if (original.color && hoveredMesh.material.color) {
+                  hoveredMesh.material.color.copy(original.color);
+                }
+                if (original.emissive && hoveredMesh.material.emissive) {
+                  hoveredMesh.material.emissive.copy(original.emissive);
+                } else if (hoveredMesh.material.emissive) {
+                  hoveredMesh.material.emissive.setRGB(0, 0, 0);
+                }
               }
               hoveredMesh = null;
               modelViewer.style.cursor = 'default';
@@ -285,9 +282,14 @@
           if (hoveredMesh) {
             const original = originalMaterials.get(hoveredMesh);
             if (original) {
-              if (original.color) hoveredMesh.material.color.copy(original.color);
-              if (original.emissive) hoveredMesh.material.emissive.copy(original.emissive);
-              else if (hoveredMesh.material.emissive) hoveredMesh.material.emissive.setRGB(0, 0, 0);
+              if (original.color && hoveredMesh.material.color) {
+                hoveredMesh.material.color.copy(original.color);
+              }
+              if (original.emissive && hoveredMesh.material.emissive) {
+                hoveredMesh.material.emissive.copy(original.emissive);
+              } else if (hoveredMesh.material.emissive) {
+                hoveredMesh.material.emissive.setRGB(0, 0, 0);
+              }
             }
             hoveredMesh = null;
             modelViewer.style.cursor = 'default';
