@@ -10,6 +10,7 @@
   <body>
     <!-- <model-viewer> HTML element -->
     <model-viewer 
+      id="buildingViewer"
       src="MiniMapBuildingTest3.glb" 
       camera-controls 
       tone-mapping="neutral" 
@@ -104,6 +105,141 @@
       console.log('🏨 Hotel Building Navigator loaded');
       console.log('📍 Hotspots configured:', ['suite_1001', 'pool']);
       console.log('🎬 Ready for 3DVista integration');
+    </script>
+    
+    <!-- Model Inspection & Hover Effects Script -->
+    <script type="module">
+      const modelViewer = document.getElementById('buildingViewer');
+      
+      let hoveredMesh = null;
+      let originalMaterials = new Map(); // Store original materials
+      
+      // Wait for model to load
+      modelViewer.addEventListener('load', () => {
+        console.log('🏗️ Model loaded! Inspecting structure...');
+        
+        const scene = modelViewer.model;
+        
+        // ===== PART 1: LOG MODEL STRUCTURE =====
+        console.log('📦 Full Scene Object:', scene);
+        
+        // Recursively print the scene tree
+        function printTree(object, indent = '', index = 0) {
+          const icon = object.isMesh ? '🔷' : object.isGroup ? '📁' : '📦';
+          console.log(`${indent}${icon} [${index}] ${object.name || 'Unnamed'} (${object.type})`);
+          
+          if (object.isMesh) {
+            console.log(`${indent}  ├─ Material: ${object.material.name || 'Unnamed'}`);
+            console.log(`${indent}  ├─ Color: ${object.material.color ? object.material.color.getHexString() : 'N/A'}`);
+            console.log(`${indent}  └─ Geometry: ${object.geometry.type}`);
+          }
+          
+          if (object.children && object.children.length > 0) {
+            object.children.forEach((child, i) => {
+              printTree(child, indent + '  ', i);
+            });
+          }
+        }
+        
+        console.log('🌳 Scene Tree Structure:');
+        printTree(scene);
+        
+        // Get all meshes and store their original materials
+        const meshes = [];
+        scene.traverse((node) => {
+          if (node.isMesh) {
+            meshes.push(node);
+            // Store original material for reset
+            originalMaterials.set(node, node.material.clone());
+            console.log('🔷 Mesh found:', {
+              name: node.name || 'Unnamed',
+              material: node.material.name || 'Unnamed',
+              color: node.material.color ? '#' + node.material.color.getHexString() : 'N/A'
+            });
+          }
+        });
+        
+        console.log('📊 Summary:');
+        console.log('  ├─ Total meshes:', meshes.length);
+        console.log('  ├─ Total materials:', originalMaterials.size);
+        console.log('  └─ Ready for hover effects!');
+        
+        // ===== PART 2: HOVER DETECTION & COLOR CHANGE =====
+        
+        // Mouse move listener for hover detection
+        modelViewer.addEventListener('mousemove', (event) => {
+          const rect = modelViewer.getBoundingClientRect();
+          const x = event.clientX - rect.left;
+          const y = event.clientY - rect.top;
+          
+          // Convert to normalized device coordinates (-1 to +1)
+          const normalizedX = (x / rect.width) * 2 - 1;
+          const normalizedY = -(y / rect.height) * 2 + 1;
+          
+          // Use model-viewer's built-in raycasting
+          const hit = modelViewer.positionAndNormalFromPoint(normalizedX, normalizedY);
+          
+          if (hit) {
+            // Get the Three.js scene and perform raycasting
+            const THREE = modelViewer.model.constructor;
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2(normalizedX, normalizedY);
+            
+            raycaster.setFromCamera(mouse, modelViewer[Symbol.for('scene')].camera);
+            const intersects = raycaster.intersectObjects(scene.children, true);
+            
+            if (intersects.length > 0) {
+              const intersectedMesh = intersects[0].object;
+              
+              // If hovering over a new mesh
+              if (intersectedMesh !== hoveredMesh && intersectedMesh.isMesh) {
+                // Reset previous mesh
+                if (hoveredMesh) {
+                  const originalMat = originalMaterials.get(hoveredMesh);
+                  if (originalMat) {
+                    hoveredMesh.material.color.copy(originalMat.color);
+                    hoveredMesh.material.emissive.copy(originalMat.emissive || {r:0,g:0,b:0});
+                  }
+                }
+                
+                // Set new hovered mesh
+                hoveredMesh = intersectedMesh;
+                
+                // Change color to highlight (light blue glow)
+                hoveredMesh.material.color.setHex(0xadd8e6); // Light blue
+                hoveredMesh.material.emissive.setHex(0x4fc3f7); // Blue glow
+                
+                console.log('🖱️ Hovering:', hoveredMesh.name || 'Unnamed mesh');
+                modelViewer.style.cursor = 'pointer';
+              }
+            }
+          } else {
+            // No intersection - reset hover
+            if (hoveredMesh) {
+              const originalMat = originalMaterials.get(hoveredMesh);
+              if (originalMat) {
+                hoveredMesh.material.color.copy(originalMat.color);
+                hoveredMesh.material.emissive.copy(originalMat.emissive || {r:0,g:0,b:0});
+              }
+              hoveredMesh = null;
+              modelViewer.style.cursor = 'default';
+            }
+          }
+        });
+        
+        // Reset on mouse leave
+        modelViewer.addEventListener('mouseleave', () => {
+          if (hoveredMesh) {
+            const originalMat = originalMaterials.get(hoveredMesh);
+            if (originalMat) {
+              hoveredMesh.material.color.copy(originalMat.color);
+              hoveredMesh.material.emissive.copy(originalMat.emissive || {r:0,g:0,b:0});
+            }
+            hoveredMesh = null;
+            modelViewer.style.cursor = 'default';
+          }
+        });
+      });
     </script>
     
   </body>
