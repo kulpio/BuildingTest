@@ -115,121 +115,121 @@
       let originalMaterials = new Map();
       let meshes = [];
       let THREE = null;
+      let scene = null;
+      let camera = null;
       
       // Wait for model to load
       modelViewer.addEventListener('load', async () => {
-        console.log('🏗️ Model loaded! Inspecting structure...');
+        console.log('🏗️ Model loaded! Searching for scene...');
         
         try {
-          // Get THREE.js reference from model
-          const model = await modelViewer.model;
-          THREE = model.constructor;
+          // Explore all symbols to find the scene
+          const symbols = Object.getOwnPropertySymbols(modelViewer);
+          console.log('🔍 Available symbols:', symbols.map(s => s.description || s.toString()));
           
-          console.log('📦 Model Object:', model);
-          console.log('🔍 Model type:', model.type);
-          console.log('🔍 Model children:', model.children);
-          
-          // Function to recursively traverse and collect meshes
-          function traverseAndCollect(object, indent = '', index = 0) {
-            const icon = object.isMesh ? '🔷' : object.isGroup ? '📁' : '📦';
-            console.log(`${indent}${icon} [${index}] ${object.name || 'Unnamed'} (${object.type})`);
+          // Try to find scene
+          for (const symbol of symbols) {
+            const value = modelViewer[symbol];
+            const desc = symbol.description || symbol.toString();
             
-            // If it's a mesh, add to our collection
-            if (object.isMesh && object.material) {
-              meshes.push(object);
-              
-              // Store original colors
-              originalMaterials.set(object, {
-                color: object.material.color ? object.material.color.clone() : null,
-                emissive: object.material.emissive ? object.material.emissive.clone() : null
-              });
-              
-              console.log(`${indent}  ├─ Material: ${object.material.name || 'Unnamed'}`);
-              if (object.material.color) {
-                console.log(`${indent}  ├─ Color: #${object.material.color.getHexString()}`);
+            if (desc === 'scene' || desc.includes('scene')) {
+              console.log('📦 Found scene:', desc, value);
+              if (value && value.modelContainer) {
+                scene = value.modelContainer;
+                console.log('✅ Got modelContainer:', scene);
+              } else if (value && value.model) {
+                scene = value.model;
+                console.log('✅ Got model from scene:', scene);
               }
-              console.log(`${indent}  └─ Geometry: ${object.geometry.type}`);
             }
             
-            // Recursively process children
-            if (object.children && object.children.length > 0) {
-              object.children.forEach((child, i) => {
-                traverseAndCollect(child, indent + '  ', i);
-              });
+            if (desc === 'camera' || desc.includes('camera')) {
+              camera = value;
+              console.log('📷 Found camera:', desc);
             }
           }
           
-          console.log('🌳 Scene Tree Structure:');
-          traverseAndCollect(model);
-          
-          console.log('📊 Summary:');
-          console.log('  ├─ Total meshes:', meshes.length);
-          console.log('  ├─ Total materials:', originalMaterials.size);
-          
-          if (meshes.length > 0) {
-            console.log('  └─ Ready for tan hover glow!');
-            setupHoverDetection();
+          // If we found the scene, traverse it
+          if (scene && scene.children) {
+            console.log('🌳 Scene has', scene.children.length, 'children');
+            
+            // Get THREE from the scene's constructor
+            THREE = scene.constructor;
+            
+            // Recursive function to find all meshes
+            function findMeshes(object, depth = 0) {
+              const indent = '  '.repeat(depth);
+              const icon = object.isMesh ? '🔷' : '📁';
+              console.log(`${indent}${icon} ${object.name || 'Unnamed'} (${object.type || 'Object'})`);
+              
+              if (object.isMesh && object.material) {
+                meshes.push(object);
+                
+                // Store original material
+                originalMaterials.set(object, {
+                  color: object.material.color ? object.material.color.clone() : null,
+                  emissive: object.material.emissive ? object.material.emissive.clone() : null
+                });
+                
+                console.log(`${indent}  ├─ Material: ${object.material.name || 'Unnamed'}`);
+                if (object.material.color) {
+                  console.log(`${indent}  └─ Color: #${object.material.color.getHexString()}`);
+                }
+              }
+              
+              if (object.children && object.children.length > 0) {
+                object.children.forEach(child => findMeshes(child, depth + 1));
+              }
+            }
+            
+            console.log('🌳 Scene Tree:');
+            findMeshes(scene);
+            
+            console.log('📊 Summary:');
+            console.log('  ├─ Total meshes:', meshes.length);
+            console.log('  └─ Total materials:', originalMaterials.size);
+            
+            if (meshes.length > 0 && camera) {
+              console.log('✅ Ready for tan hover glow!');
+              setupHoverDetection();
+            } else {
+              console.warn('⚠️ Missing meshes or camera');
+            }
           } else {
-            console.warn('  └─ No meshes found - hover effect disabled');
+            console.error('❌ Could not find scene with children');
           }
           
         } catch (error) {
-          console.error('❌ Error loading model:', error);
+          console.error('❌ Error:', error);
         }
       });
       
       function setupHoverDetection() {
-        if (!THREE || meshes.length === 0) {
-          console.warn('⚠️ Cannot setup hover - THREE or meshes not available');
+        if (!THREE || !camera || meshes.length === 0) {
+          console.warn('⚠️ Cannot setup hover detection');
           return;
         }
         
-        // Get camera and scene
-        const getSceneAndCamera = () => {
-          const symbols = Object.getOwnPropertySymbols(modelViewer);
-          
-          // Find the scene symbol
-          const sceneSymbol = symbols.find(s => s.description === 'scene');
-          const scene = sceneSymbol ? modelViewer[sceneSymbol] : null;
-          
-          if (scene && scene.camera) {
-            return { scene, camera: scene.camera };
-          }
-          
-          // Fallback: try to get camera directly
-          const cameraSymbol = symbols.find(s => s.description === 'camera');
-          const camera = cameraSymbol ? modelViewer[cameraSymbol] : null;
-          
-          return { scene, camera };
-        };
-        
-        // Create raycaster
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         
         // Mouse move handler
         modelViewer.addEventListener('mousemove', (event) => {
-          const { camera } = getSceneAndCamera();
-          if (!camera) return;
-          
           const rect = modelViewer.getBoundingClientRect();
           const x = event.clientX - rect.left;
           const y = event.clientY - rect.top;
           
-          // Convert to normalized device coordinates
           mouse.x = (x / rect.width) * 2 - 1;
           mouse.y = -(y / rect.height) * 2 + 1;
           
-          // Perform raycasting
           raycaster.setFromCamera(mouse, camera);
           const intersects = raycaster.intersectObjects(meshes, false);
           
           if (intersects.length > 0) {
             const intersectedMesh = intersects[0].object;
             
-            // If hovering over a new mesh
             if (intersectedMesh !== hoveredMesh) {
-              // Reset previous mesh
+              // Reset previous
               if (hoveredMesh) {
                 const original = originalMaterials.get(hoveredMesh);
                 if (original) {
@@ -244,21 +244,20 @@
                 }
               }
               
-              // Set new hovered mesh with TAN GLOW
+              // Apply TAN GLOW
               hoveredMesh = intersectedMesh;
-              
               if (hoveredMesh.material.color) {
-                hoveredMesh.material.color.setHex(0xD2B48C); // Tan color
+                hoveredMesh.material.color.setHex(0xD2B48C); // Tan
               }
               if (hoveredMesh.material.emissive) {
-                hoveredMesh.material.emissive.setHex(0xC19A6B); // Warm tan glow
+                hoveredMesh.material.emissive.setHex(0xC19A6B); // Tan glow
               }
               
-              console.log('🖱️ Hovering:', hoveredMesh.name || 'Unnamed mesh');
+              console.log('🖱️ Hovering:', hoveredMesh.name || 'Unnamed');
               modelViewer.style.cursor = 'pointer';
             }
           } else {
-            // No intersection - reset
+            // Reset
             if (hoveredMesh) {
               const original = originalMaterials.get(hoveredMesh);
               if (original) {
@@ -277,7 +276,7 @@
           }
         });
         
-        // Reset on mouse leave
+        // Mouse leave
         modelViewer.addEventListener('mouseleave', () => {
           if (hoveredMesh) {
             const original = originalMaterials.get(hoveredMesh);
