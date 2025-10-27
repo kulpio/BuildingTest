@@ -1,98 +1,140 @@
-:not(:defined) > * {
-  display: none;
-}
+/* Radial Center Blur Effect - Clear center, frosted edges */
 
-html {
-  height: 100%;
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 body {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
+  overflow: hidden;
+  background: transparent;
 }
 
+/* Model Viewer - Fully Transparent with Radial Blur Overlay */
 model-viewer {
   width: 100%;
-  height: 90%;
-  background-color: #ffffff;
-}
-
-.Hotspot {
-  background: #fff;
-  border-radius: 32px;
-  border: 0;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
-  box-sizing: border-box;
-  cursor: pointer;
-  height: 24px;
-  padding: 8px;
-  position: relative;
-  transition: opacity 0.3s;
-  width: 24px;
-}
-
-.Hotspot:not([data-visible]) {
+  height: 100vh;
+  --poster-color: transparent;
   background: transparent;
-  border: 4px solid #fff;
-  box-shadow: none;
-  height: 32px;
-  pointer-events: none;
-  width: 32px;
+  position: relative;
 }
 
-.Hotspot:focus {
-  border: 4px solid rgb(0, 128, 200);
-  height: 32px;
-  outline: none;
-  width: 32px;
-}
-
-.Hotspot > * {
-  opacity: 1;
-  transform: translateY(-50%);
-}
-
-.HotspotAnnotation{
-  background: #fff;
-  border-radius: 4px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
-  color: rgba(0, 0, 0, 0.8);
-  display: block;
-  font-family: Futura, Helvetica Neue, sans-serif;
-  font-size: 18px;
-  font-weight: 700;
-  left: calc(100% + 1em);
-  max-width: 128px;
-  overflow-wrap: break-word;
-  padding: 0.5em 1em;
+/* Radial Blur Effect - Clear center, increasing blur towards edges */
+model-viewer::before {
+  content: '';
   position: absolute;
-  top: 50%;
-  width: max-content;
-}
-
-.Hotspot:not([data-visible]) > * {
-  opacity: 0;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
-  transform: translateY(calc(-50% + 4px));
-  transition: transform 0.3s, opacity 0.3s;
+  z-index: -1;
+  
+  /* Radial gradient mask - transparent center, white edges */
+  background: radial-gradient(
+    circle at center,
+    transparent 0%,
+    transparent 30%,
+    rgba(255, 255, 255, 0.3) 60%,
+    rgba(255, 255, 255, 0.6) 100%
+  );
+  
+  /* Apply blur effect */
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
+/* Hotspot Buttons - Minimal Style */
+.Hotspot {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  
+  box-shadow: 
+    0 2px 8px rgba(0, 0, 0, 0.15),
+    0 1px 2px rgba(0, 0, 0, 0.1);
+  
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  outline: none;
+}
 
+.Hotspot:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: scale(1.2);
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.2),
+    0 2px 4px rgba(0, 0, 0, 0.12);
+}
+
+.Hotspot:active {
+  transform: scale(1.1);
+}
+
+/* Hotspot Annotation Labels */
+.HotspotAnnotation {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-12px);
+  
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  
+  pointer-events: none;
+  opacity: 0;
+  transition: all 0.2s ease;
+}
+
+.HotspotAnnotation::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: rgba(0, 0, 0, 0.85);
+}
+
+.Hotspot:hover .HotspotAnnotation {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-14px);
+}
+
+/* Progress Bar */
 .progress-bar {
   display: block;
   width: 33%;
-  height: 10%;
-  max-height: 2%;
+  height: 4px;
+  max-height: 4px;
   position: absolute;
   left: 50%;
   top: 50%;
-  transform: translate3d(-50%, -50%, 0);
-  border-radius: 25px;
-  box-shadow: 0px 3px 10px 3px rgba(0, 0, 0, 0.5), 0px 0px 5px 1px rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  background-color: rgba(0, 0, 0, 0.5);
+  transform: translate(-50%, -50%);
+  
+  background: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 10px;
+  overflow: hidden;
 }
 
 .progress-bar.hide {
@@ -101,69 +143,22 @@ model-viewer {
 }
 
 .update-bar {
-  background-color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.8);
   width: 0%;
   height: 100%;
-  border-radius: 25px;
-  float: left;
+  border-radius: 10px;
   transition: width 0.3s;
 }
 
-#ar-button {
-  background-image: url(ar_icon.png);
-  background-repeat: no-repeat;
-  background-size: 20px 20px;
-  background-position: 12px 50%;
-  background-color: #fff;
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  bottom: 16px;
-  padding: 0px 16px 0px 40px;
-  font-family: Roboto Regular, Helvetica Neue, sans-serif;
-  font-size: 14px;
-  color:#4285f4;
-  height: 36px;
-  line-height: 36px;
-  border-radius: 18px;
-  border: 1px solid #DADCE0;
-}
-
-#ar-button:active {
-  background-color: #E8EAED;
-}
-
-#ar-button:focus {
-  outline: none;
-}
-
-#ar-button:focus-visible {
-  outline: 1px solid #4285f4;
-}
-
-@keyframes circle {
-  from { transform: translateX(-50%) rotate(0deg) translateX(50px) rotate(0deg); }
-  to   { transform: translateX(-50%) rotate(360deg) translateX(50px) rotate(-360deg); }
-}
-
-@keyframes elongate {
-  from { transform: translateX(100px); }
-  to   { transform: translateX(-100px); }
-}
-
-model-viewer > #ar-prompt {
-  position: absolute;
-  left: 50%;
-  bottom: 60px;
-  animation: elongate 2s infinite ease-in-out alternate;
-  display: none;
-}
-
-model-viewer[ar-status="session-started"] > #ar-prompt {
-  display: block;
-}
-
-model-viewer > #ar-prompt > img {
-  animation: circle 4s linear infinite;
+/* Responsive */
+@media (max-width: 768px) {
+  .Hotspot {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .HotspotAnnotation {
+    font-size: 11px;
+    padding: 5px 10px;
+  }
 }
