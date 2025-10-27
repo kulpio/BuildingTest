@@ -114,7 +114,6 @@
       let hoveredMesh = null;
       let originalMaterials = new Map();
       let meshes = [];
-      let meshBounds = new Map(); // Store bounding boxes for each mesh
       
       // Wait for model to load
       modelViewer.addEventListener('load', async () => {
@@ -136,21 +135,10 @@
           }
           
           if (scene && scene.children) {
-            // Recursive function to find all meshes
-            function findMeshes(object, depth = 0) {
-              const indent = '  '.repeat(depth);
-              
+            // Find all meshes
+            function findMeshes(object) {
               if (object.isMesh && object.material) {
                 meshes.push(object);
-                
-                // Calculate and store bounding box
-                if (object.geometry && object.geometry.boundingBox) {
-                  object.geometry.computeBoundingBox();
-                  meshBounds.set(object, object.geometry.boundingBox.clone());
-                } else if (object.geometry) {
-                  object.geometry.computeBoundingBox();
-                  meshBounds.set(object, object.geometry.boundingBox);
-                }
                 
                 // Store original material
                 originalMaterials.set(object, {
@@ -158,25 +146,31 @@
                   emissive: object.material.emissive ? object.material.emissive.clone() : null
                 });
                 
-                console.log(`${indent}🔷 ${object.name || 'Unnamed'} (Mesh)`);
-                console.log(`${indent}  └─ Color: #${object.material.color.getHexString()}`);
+                console.log('🔷', object.name, '- Position Y:', object.position?.y || 'N/A');
               }
               
               if (object.children && object.children.length > 0) {
-                object.children.forEach(child => findMeshes(child, depth + 1));
+                object.children.forEach(child => findMeshes(child));
               }
             }
             
-            console.log('🌳 Finding meshes:');
             findMeshes(scene);
             
-            console.log('📊 Summary:');
-            console.log('  ├─ Total meshes:', meshes.length);
-            console.log('  └─ Total bounds:', meshBounds.size);
+            // Sort meshes by Y position (bottom to top)
+            meshes.sort((a, b) => {
+              const aY = a.position?.y || 0;
+              const bY = b.position?.y || 0;
+              return aY - bY;
+            });
+            
+            console.log('📊 Found', meshes.length, 'meshes (sorted by Y position)');
+            meshes.forEach((m, i) => {
+              console.log(`  [${i}] ${m.name} at Y=${m.position?.y || 'N/A'}`);
+            });
             
             if (meshes.length > 0) {
               console.log('✅ Ready for tan hover glow!');
-              setupManualHoverDetection();
+              setupHoverDetection();
             }
           }
           
@@ -185,13 +179,18 @@
         }
       });
       
-      function setupManualHoverDetection() {
-        console.log('🔧 Setting up manual per-mesh hover detection...');
+      function setupHoverDetection() {
+        console.log('🔧 Setting up Y-coordinate based hover detection...');
         
-        let lastHitPosition = null;
+        let mouseMoveCount = 0;
         
         // Mouse move handler
         modelViewer.addEventListener('mousemove', (event) => {
+          mouseMoveCount++;
+          
+          // Only log every 20th mousemove to avoid spam
+          const shouldLog = mouseMoveCount % 20 === 0;
+          
           const rect = modelViewer.getBoundingClientRect();
           const x = event.clientX - rect.left;
           const y = event.clientY - rect.top;
@@ -200,41 +199,49 @@
           const normalizedX = (x / rect.width) * 2 - 1;
           const normalizedY = -(y / rect.height) * 2 + 1;
           
-          // Use model-viewer's built-in hit detection
+          if (shouldLog) {
+            console.log('🖱️ Mouse:', { x: normalizedX.toFixed(2), y: normalizedY.toFixed(2) });
+          }
+          
+          // Try to get hit position
           const hit = modelViewer.positionAndNormalFromPoint(normalizedX, normalizedY);
           
           if (hit) {
-            const hitPosition = hit.position;
+            if (shouldLog) {
+              console.log('✨ Hit detected at Y:', hit.position.y.toFixed(3));
+            }
             
-            // Check which mesh is closest to hit position
-            let closestMesh = null;
-            let closestDistance = Infinity;
+            // Determine which mesh based on Y coordinate
+            const hitY = hit.position.y;
             
-            meshes.forEach(mesh => {
-              // Get mesh world position
-              if (mesh.position) {
-                const dx = hitPosition.x - mesh.position.x;
-                const dy = hitPosition.y - mesh.position.y;
-                const dz = hitPosition.z - mesh.position.z;
-                const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
-                
-                // Check if this mesh is closest
-                if (distance < closestDistance) {
-                  closestDistance = distance;
-                  closestMesh = mesh;
+            // Simple logic: if Y > 0.5, it's second_floor, else first_floor
+            let targetMesh = null;
+            
+            if (meshes.length === 2) {
+              // Assume meshes[0] is first_floor (lower), meshes[1] is second_floor (higher)
+              const midY = (meshes[0].position.y + meshes[1].position.y) / 2;
+              targetMesh = hitY > midY ? meshes[1] : meshes[0];
+            } else {
+              // Fallback: pick closest mesh by Y
+              let closestDist = Infinity;
+              meshes.forEach(mesh => {
+                const dist = Math.abs(hitY - (mesh.position?.y || 0));
+                if (dist < closestDist) {
+                  closestDist = dist;
+                  targetMesh = mesh;
                 }
-              }
-            });
+              });
+            }
             
-            // If we found a mesh and it's different from current hover
-            if (closestMesh && closestMesh !== hoveredMesh) {
-              // Reset previous mesh
+            // If we found a mesh and it's different
+            if (targetMesh && targetMesh !== hoveredMesh) {
+              // Reset previous
               if (hoveredMesh) {
                 resetMesh(hoveredMesh);
               }
               
-              // Set new hovered mesh with TAN GLOW
-              hoveredMesh = closestMesh;
+              // Apply TAN GLOW
+              hoveredMesh = targetMesh;
               if (hoveredMesh.material.color) {
                 hoveredMesh.material.color.setHex(0xD2B48C); // Tan
               }
@@ -242,12 +249,15 @@
                 hoveredMesh.material.emissive.setHex(0xC19A6B); // Tan glow
               }
               
-              console.log('🖱️ Hovering:', hoveredMesh.name || 'Unnamed');
+              console.log('✅ Hovering:', hoveredMesh.name);
               modelViewer.style.cursor = 'pointer';
             }
           } else {
-            // No hit - reset hover
+            // No hit - reset
             if (hoveredMesh) {
+              if (shouldLog) {
+                console.log('❌ No hit - resetting');
+              }
               resetMesh(hoveredMesh);
               hoveredMesh = null;
               modelViewer.style.cursor = 'default';
@@ -255,8 +265,9 @@
           }
         });
         
-        // Mouse leave - always reset
+        // Mouse leave
         modelViewer.addEventListener('mouseleave', () => {
+          console.log('👋 Mouse left viewer');
           if (hoveredMesh) {
             resetMesh(hoveredMesh);
             hoveredMesh = null;
@@ -264,7 +275,7 @@
           }
         });
         
-        console.log('✅ Manual hover detection enabled!');
+        console.log('✅ Hover detection enabled!');
       }
       
       function resetMesh(mesh) {
