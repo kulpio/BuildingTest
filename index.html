@@ -1,0 +1,74 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta http-equiv="Content-Style-Type" content="text/css">
+  <title></title>
+  <meta name="Description" content="&lt;model-viewer&gt; template">
+  <meta name="Generator" content="Cocoa HTML Writer">
+  <meta name="CocoaVersion" content="2575.7">
+  <style type="text/css">
+    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 11.0px 'Helvetica Neue'; color: #000000; color: rgba(0, 0, 0, 0.85); -webkit-text-stroke: rgba(0, 0, 0, 0.85); background-color: #b3b3b3}
+    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 11.0px 'Helvetica Neue'; color: #000000; color: rgba(0, 0, 0, 0.85); -webkit-text-stroke: rgba(0, 0, 0, 0.85); background-color: #b3b3b3; min-height: 13.0px}
+    span.s1 {font-kerning: none}
+  </style>
+</head>
+<body>
+<p class="p1"><span class="s1">onclick="navigateTo('suite_1001')"</span></p>
+<p class="p1"><span class="s1">onclick="navigateTo('pool')"</span></p>
+<p class="p1"><span class="s1">```</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">**2. Added navigation script at the bottom** (before `&lt;/body&gt;`) with:</span></p>
+<p class="p1"><span class="s1">- Hash-based navigation for 3DVista automatic routing</span></p>
+<p class="p1"><span class="s1">- PostMessage backup method</span></p>
+<p class="p1"><span class="s1">- Visual feedback when clicking</span></p>
+<p class="p1"><span class="s1">- Console logging for debugging</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">---</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">## Next Steps:</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">### 1. Replace Your Original File</span></p>
+<p class="p1"><span class="s1">- Download the modified `index.html` from the link above</span></p>
+<p class="p1"><span class="s1">- Replace your original `index.html` with this one</span></p>
+<p class="p1"><span class="s1">- Keep all other files (GLB, images, CSS, JS) the same</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">### 2. Deploy to Vercel</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">**Option A: Drag &amp; Drop (Easiest)**</span></p>
+<p class="p1"><span class="s1">1. Go to [vercel.com](https://vercel.com/new)</span></p>
+<p class="p1"><span class="s1">2. Click "Browse" or look for upload area</span></p>
+<p class="p1"><span class="s1">3. Select your entire folder with all files:</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">   </span>- ✅ index.html (the new modified one)</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">   </span>- ✅ MiniMapBuildingTest3.glb</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">   </span>- ✅ poster.webp</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">   </span>- ✅ styles.css</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">   </span>- ✅ script.js</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">   </span>- ✅ ar_hand_prompt.png</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">   </span>- ✅ ar_icon.png</span></p>
+<p class="p1"><span class="s1">4. Name your project: `hotel-navigator` (or whatever you like)</span></p>
+<p class="p1"><span class="s1">5. Click "Deploy"</span></p>
+<p class="p1"><span class="s1">6. Wait ~30 seconds</span></p>
+<p class="p1"><span class="s1">7. Copy your URL: `https://your-project.vercel.app`</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">### 3. Set Up in 3DVista</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">**In 3DVista, rename your panoramas to match:**</span></p>
+<p class="p1"><span class="s1">- One panorama → rename to: `suite_1001`</span></p>
+<p class="p1"><span class="s1">- Another panorama → rename to: `pool`</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">**Add Web Frame in Skin Editor:**</span></p>
+<p class="p1"><span class="s1">1. Skin tab → Skin Editor</span></p>
+<p class="p1"><span class="s1">2. Add Container (top-right corner, ~300×450px)</span></p>
+<p class="p1"><span class="s1">3. Add Web Frame inside container</span></p>
+<p class="p1"><span class="s1">4. Set URL to: `https://your-project.vercel.app/index.html`</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">### 4. Test It!</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">When you click the hotspots, check browser console (F12) - you should see:</span></p>
+<p class="p1"><span class="s1">```</span></p>
+<p class="p1"><span class="s1">🎯 Navigating to: suite_1001</span></p>
+<p class="p1"><span class="s1">✅ Hash navigation sent: media=suite_1001</span></p>
+<p class="p1"><span class="s1">✅ PostMessage sent: suite_1001</span></p>
+</body>
+</html>
