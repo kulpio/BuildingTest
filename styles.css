@@ -25,28 +25,29 @@ model-viewer {
 model-viewer::before {
   content: '';
   position: absolute;
-  top: -10%;
-  left: -10%;
-  width: 120%;
-  height: 120%;
+  top: -30%;
+  left: -30%;
+  width: 160%;
+  height: 160%;
   pointer-events: none;
   z-index: -1;
   
-  /* Inverted radial gradient - frosted center, transparent edges */
-  /* Extended beyond frame to prevent cutoff, reduced white intensity */
+  /* Extended radial gradient - frosted center, transparent edges */
+  /* Gradient fades to transparent well before frame edges */
   background: radial-gradient(
     circle at center,
-    rgba(255, 255, 255, 0.25) 0%,
-    rgba(255, 255, 255, 0.15) 20%,
-    rgba(255, 255, 255, 0.08) 35%,
-    rgba(255, 255, 255, 0.03) 50%,
-    rgba(255, 255, 255, 0.01) 65%,
-    transparent 80%
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(255, 255, 255, 0.2) 15%,
+    rgba(255, 255, 255, 0.1) 25%,
+    rgba(255, 255, 255, 0.05) 35%,
+    rgba(255, 255, 255, 0.02) 45%,
+    rgba(255, 255, 255, 0.005) 55%,
+    transparent 65%
   );
   
-  /* Increased blur effect */
-  backdrop-filter: blur(50px) saturate(150%);
-  -webkit-backdrop-filter: blur(50px) saturate(150%);
+  /* Increased center blur effect */
+  backdrop-filter: blur(60px) saturate(150%);
+  -webkit-backdrop-filter: blur(60px) saturate(150%);
 }
 
 /* Hotspot Buttons - Minimal Style */
