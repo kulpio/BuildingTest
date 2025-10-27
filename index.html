@@ -107,7 +107,7 @@
       console.log('🎬 Ready for 3DVista integration');
     </script>
     
-    <!-- Model Inspection & Hover Effects Script -->
+    <!-- Model Inspection & Tan Hover Glow Effect Script -->
     <script type="module">
       const modelViewer = document.getElementById('buildingViewer');
       
@@ -120,7 +120,7 @@
         
         const scene = modelViewer.model;
         
-        // ===== PART 1: LOG MODEL STRUCTURE =====
+        // ===== LOG MODEL STRUCTURE =====
         console.log('📦 Full Scene Object:', scene);
         
         // Recursively print the scene tree
@@ -130,7 +130,7 @@
           
           if (object.isMesh) {
             console.log(`${indent}  ├─ Material: ${object.material.name || 'Unnamed'}`);
-            console.log(`${indent}  ├─ Color: ${object.material.color ? object.material.color.getHexString() : 'N/A'}`);
+            console.log(`${indent}  ├─ Color: ${object.material.color ? '#' + object.material.color.getHexString() : 'N/A'}`);
             console.log(`${indent}  └─ Geometry: ${object.geometry.type}`);
           }
           
@@ -150,7 +150,10 @@
           if (node.isMesh) {
             meshes.push(node);
             // Store original material for reset
-            originalMaterials.set(node, node.material.clone());
+            originalMaterials.set(node, {
+              color: node.material.color.clone(),
+              emissive: node.material.emissive ? node.material.emissive.clone() : null
+            });
             console.log('🔷 Mesh found:', {
               name: node.name || 'Unnamed',
               material: node.material.name || 'Unnamed',
@@ -162,9 +165,12 @@
         console.log('📊 Summary:');
         console.log('  ├─ Total meshes:', meshes.length);
         console.log('  ├─ Total materials:', originalMaterials.size);
-        console.log('  └─ Ready for hover effects!');
+        console.log('  └─ Ready for tan hover glow!');
         
-        // ===== PART 2: HOVER DETECTION & COLOR CHANGE =====
+        // ===== TAN HOVER GLOW EFFECT =====
+        
+        // Import Three.js for raycasting
+        const THREE = window.THREE;
         
         // Mouse move listener for hover detection
         modelViewer.addEventListener('mousemove', (event) => {
@@ -176,16 +182,13 @@
           const normalizedX = (x / rect.width) * 2 - 1;
           const normalizedY = -(y / rect.height) * 2 + 1;
           
-          // Use model-viewer's built-in raycasting
-          const hit = modelViewer.positionAndNormalFromPoint(normalizedX, normalizedY);
-          
-          if (hit) {
-            // Get the Three.js scene and perform raycasting
-            const THREE = modelViewer.model.constructor;
+          // Access Three.js internals for raycasting
+          try {
+            const camera = modelViewer[Object.getOwnPropertySymbols(modelViewer).find(s => s.description === 'camera')];
             const raycaster = new THREE.Raycaster();
             const mouse = new THREE.Vector2(normalizedX, normalizedY);
             
-            raycaster.setFromCamera(mouse, modelViewer[Symbol.for('scene')].camera);
+            raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObjects(scene.children, true);
             
             if (intersects.length > 0) {
@@ -195,45 +198,60 @@
               if (intersectedMesh !== hoveredMesh && intersectedMesh.isMesh) {
                 // Reset previous mesh
                 if (hoveredMesh) {
-                  const originalMat = originalMaterials.get(hoveredMesh);
-                  if (originalMat) {
-                    hoveredMesh.material.color.copy(originalMat.color);
-                    hoveredMesh.material.emissive.copy(originalMat.emissive || {r:0,g:0,b:0});
+                  const original = originalMaterials.get(hoveredMesh);
+                  if (original) {
+                    hoveredMesh.material.color.copy(original.color);
+                    if (original.emissive) {
+                      hoveredMesh.material.emissive.copy(original.emissive);
+                    } else {
+                      hoveredMesh.material.emissive.setRGB(0, 0, 0);
+                    }
                   }
                 }
                 
                 // Set new hovered mesh
                 hoveredMesh = intersectedMesh;
                 
-                // Change color to highlight (light blue glow)
-                hoveredMesh.material.color.setHex(0xadd8e6); // Light blue
-                hoveredMesh.material.emissive.setHex(0x4fc3f7); // Blue glow
+                // TAN GLOW EFFECT
+                hoveredMesh.material.color.setHex(0xD2B48C); // Tan color
+                hoveredMesh.material.emissive.setHex(0xC19A6B); // Warm tan glow
                 
                 console.log('🖱️ Hovering:', hoveredMesh.name || 'Unnamed mesh');
                 modelViewer.style.cursor = 'pointer';
               }
-            }
-          } else {
-            // No intersection - reset hover
-            if (hoveredMesh) {
-              const originalMat = originalMaterials.get(hoveredMesh);
-              if (originalMat) {
-                hoveredMesh.material.color.copy(originalMat.color);
-                hoveredMesh.material.emissive.copy(originalMat.emissive || {r:0,g:0,b:0});
+            } else {
+              // No intersection - reset hover
+              if (hoveredMesh) {
+                const original = originalMaterials.get(hoveredMesh);
+                if (original) {
+                  hoveredMesh.material.color.copy(original.color);
+                  if (original.emissive) {
+                    hoveredMesh.material.emissive.copy(original.emissive);
+                  } else {
+                    hoveredMesh.material.emissive.setRGB(0, 0, 0);
+                  }
+                }
+                hoveredMesh = null;
+                modelViewer.style.cursor = 'default';
               }
-              hoveredMesh = null;
-              modelViewer.style.cursor = 'default';
             }
+          } catch (e) {
+            // Fallback if raycasting fails
+            console.warn('Raycasting failed:', e);
           }
         });
         
         // Reset on mouse leave
         modelViewer.addEventListener('mouseleave', () => {
           if (hoveredMesh) {
-            const originalMat = originalMaterials.get(hoveredMesh);
-            if (originalMat) {
-              hoveredMesh.material.color.copy(originalMat.color);
-              hoveredMesh.material.emissive.copy(originalMat.emissive || {r:0,g:0,b:0});
+            const original = originalMaterials.get(hoveredMesh);
+            if (original) {
+              hoveredMesh.material.color.copy(original.color);
+              if (original.emissive) {
+                hoveredMesh.material.emissive.copy(original.emissive);
+              } else {
+                hoveredMesh.material.emissive.setRGB(0, 0, 0);
+              }
             }
             hoveredMesh = null;
             modelViewer.style.cursor = 'default';

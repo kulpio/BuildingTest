@@ -21,7 +21,7 @@ model-viewer {
   position: relative;
 }
 
-/* Frosted Center Effect - Fully transparent edges, frosted only in center */
+/* Frosted Center Effect - Smaller radius, fully transparent edges */
 model-viewer::before {
   content: '';
   position: absolute;
@@ -32,16 +32,16 @@ model-viewer::before {
   pointer-events: none;
   z-index: -1;
   
-  /* Radial gradient - frosted center with 100% transparent padding at edges */
+  /* Smaller radial gradient - frosted center with larger transparent padding at edges */
   background: radial-gradient(
     circle at center,
     rgba(255, 255, 255, 0.35) 0%,
-    rgba(255, 255, 255, 0.25) 15%,
-    rgba(255, 255, 255, 0.15) 30%,
-    rgba(255, 255, 255, 0.08) 45%,
-    rgba(255, 255, 255, 0.03) 55%,
-    rgba(255, 255, 255, 0.01) 65%,
-    transparent 75%,
+    rgba(255, 255, 255, 0.25) 10%,
+    rgba(255, 255, 255, 0.15) 20%,
+    rgba(255, 255, 255, 0.08) 30%,
+    rgba(255, 255, 255, 0.03) 40%,
+    rgba(255, 255, 255, 0.01) 50%,
+    transparent 60%,
     transparent 100%
   );
   
