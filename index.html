@@ -107,7 +107,7 @@
       console.log('🎬 Ready for 3DVista integration');
     </script>
     
-    <!-- Screen-Based Hover with FORCED RENDER -->
+    <!-- Screen-Based Hover with CONTINUOUS RENDER LOOP -->
     <script type="module">
       const modelViewer = document.getElementById('buildingViewer');
       
@@ -115,20 +115,24 @@
       let originalMaterials = new Map();
       let firstFloor = null;
       let secondFloor = null;
+      let renderLoopActive = false;
       
-      // Function to force render update
-      function forceRender() {
-        // Method 1: Try model-viewer's internal update
-        if (typeof modelViewer.requestUpdate === 'function') {
-          modelViewer.requestUpdate();
+      // Continuous render loop - forces model-viewer to keep rendering
+      function startRenderLoop() {
+        if (renderLoopActive) return;
+        renderLoopActive = true;
+        
+        function animate() {
+          // Tiny camera nudge to force render (0.00001 radians is imperceptible)
+          const orbit = modelViewer.getCameraOrbit();
+          const nudge = Math.sin(Date.now() / 10000) * 0.00001;
+          modelViewer.cameraOrbit = `${orbit.theta + nudge}rad ${orbit.phi}rad ${orbit.radius}m`;
+          
+          requestAnimationFrame(animate);
         }
         
-        // Method 2: Use requestAnimationFrame to ensure next frame renders
-        requestAnimationFrame(() => {
-          // Trigger a tiny camera change to force render
-          const orbit = modelViewer.getCameraOrbit();
-          modelViewer.cameraOrbit = `${orbit.theta}rad ${orbit.phi}rad ${orbit.radius}m`;
-        });
+        animate();
+        console.log('🔄 Continuous render loop started');
       }
       
       // Wait for model to load
@@ -178,8 +182,9 @@
             findMeshes(scene);
             
             if (firstFloor && secondFloor) {
-              console.log('✅ Ready for hover with forced rendering!');
-              setupHoverWithRender();
+              console.log('✅ Ready for instant hover rendering!');
+              startRenderLoop(); // Start continuous rendering
+              setupHover();
             }
           }
           
@@ -188,8 +193,8 @@
         }
       });
       
-      function setupHoverWithRender() {
-        console.log('🔧 Setting up hover with render forcing...');
+      function setupHover() {
+        console.log('🔧 Setting up hover detection...');
         
         // Mouse move handler
         modelViewer.addEventListener('mousemove', (event) => {
@@ -230,9 +235,6 @@
             
             console.log('✨ GLOWING:', hoveredMesh.name);
             modelViewer.style.cursor = 'pointer';
-            
-            // FORCE RENDER UPDATE - This is the key fix!
-            forceRender();
           }
         });
         
@@ -243,13 +245,10 @@
             resetMesh(hoveredMesh);
             hoveredMesh = null;
             modelViewer.style.cursor = 'default';
-            
-            // Force render on reset too
-            forceRender();
           }
         });
         
-        console.log('✅ Hover with forced rendering enabled!');
+        console.log('✅ Hover enabled with continuous rendering!');
       }
       
       function resetMesh(mesh) {
