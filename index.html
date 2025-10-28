@@ -107,7 +107,7 @@
       console.log('🎬 Ready for 3DVista integration');
     </script>
     
-    <!-- Simple Screen-Based Hover with BRIGHT Tan Glow -->
+    <!-- Screen-Based Hover with FORCED RENDER -->
     <script type="module">
       const modelViewer = document.getElementById('buildingViewer');
       
@@ -115,6 +115,21 @@
       let originalMaterials = new Map();
       let firstFloor = null;
       let secondFloor = null;
+      
+      // Function to force render update
+      function forceRender() {
+        // Method 1: Try model-viewer's internal update
+        if (typeof modelViewer.requestUpdate === 'function') {
+          modelViewer.requestUpdate();
+        }
+        
+        // Method 2: Use requestAnimationFrame to ensure next frame renders
+        requestAnimationFrame(() => {
+          // Trigger a tiny camera change to force render
+          const orbit = modelViewer.getCameraOrbit();
+          modelViewer.cameraOrbit = `${orbit.theta}rad ${orbit.phi}rad ${orbit.radius}m`;
+        });
+      }
       
       // Wait for model to load
       modelViewer.addEventListener('load', async () => {
@@ -163,8 +178,8 @@
             findMeshes(scene);
             
             if (firstFloor && secondFloor) {
-              console.log('✅ Both floors found - ready for BRIGHT tan hover!');
-              setupBrightHover();
+              console.log('✅ Ready for hover with forced rendering!');
+              setupHoverWithRender();
             }
           }
           
@@ -173,8 +188,8 @@
         }
       });
       
-      function setupBrightHover() {
-        console.log('🔧 Setting up BRIGHT visible hover effect...');
+      function setupHoverWithRender() {
+        console.log('🔧 Setting up hover with render forcing...');
         
         // Mouse move handler
         modelViewer.addEventListener('mousemove', (event) => {
@@ -204,7 +219,6 @@
               // Set STRONG emissive glow
               if (hoveredMesh.material.emissive) {
                 hoveredMesh.material.emissive.setHex(0xD2A679); // Warm tan glow
-                // Make emissive intensity stronger
                 if (hoveredMesh.material.emissiveIntensity !== undefined) {
                   hoveredMesh.material.emissiveIntensity = 0.5;
                 }
@@ -216,6 +230,9 @@
             
             console.log('✨ GLOWING:', hoveredMesh.name);
             modelViewer.style.cursor = 'pointer';
+            
+            // FORCE RENDER UPDATE - This is the key fix!
+            forceRender();
           }
         });
         
@@ -226,10 +243,13 @@
             resetMesh(hoveredMesh);
             hoveredMesh = null;
             modelViewer.style.cursor = 'default';
+            
+            // Force render on reset too
+            forceRender();
           }
         });
         
-        console.log('✅ Bright hover enabled - should be very visible!');
+        console.log('✅ Hover with forced rendering enabled!');
       }
       
       function resetMesh(mesh) {
