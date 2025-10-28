@@ -107,7 +107,7 @@
       console.log('🎬 Ready for 3DVista integration');
     </script>
     
-    <!-- Simple Screen-Based Hover Effect -->
+    <!-- Simple Screen-Based Hover with BRIGHT Tan Glow -->
     <script type="module">
       const modelViewer = document.getElementById('buildingViewer');
       
@@ -162,16 +162,9 @@
             
             findMeshes(scene);
             
-            console.log('📊 Meshes found:', { 
-              firstFloor: firstFloor ? '✓' : '✗', 
-              secondFloor: secondFloor ? '✓' : '✗' 
-            });
-            
             if (firstFloor && secondFloor) {
-              console.log('✅ Ready for simple screen-based hover!');
-              setupSimpleHover();
-            } else {
-              console.warn('⚠️ Could not find both floor meshes');
+              console.log('✅ Both floors found - ready for BRIGHT tan hover!');
+              setupBrightHover();
             }
           }
           
@@ -180,10 +173,8 @@
         }
       });
       
-      function setupSimpleHover() {
-        console.log('🔧 Setting up simple screen-based hover...');
-        console.log('   Top half of screen → second_floor');
-        console.log('   Bottom half of screen → first_floor');
+      function setupBrightHover() {
+        console.log('🔧 Setting up BRIGHT visible hover effect...');
         
         // Mouse move handler
         modelViewer.addEventListener('mousemove', (event) => {
@@ -201,16 +192,29 @@
               resetMesh(hoveredMesh);
             }
             
-            // Apply TAN GLOW
+            // Apply BRIGHT TAN GLOW
             hoveredMesh = targetMesh;
-            if (hoveredMesh.material.color) {
-              hoveredMesh.material.color.setHex(0xD2B48C); // Tan
-            }
-            if (hoveredMesh.material.emissive) {
-              hoveredMesh.material.emissive.setHex(0xC19A6B); // Tan glow
+            
+            if (hoveredMesh.material) {
+              // Set bright tan base color
+              if (hoveredMesh.material.color) {
+                hoveredMesh.material.color.setHex(0xF4E4C1); // Bright tan/cream
+              }
+              
+              // Set STRONG emissive glow
+              if (hoveredMesh.material.emissive) {
+                hoveredMesh.material.emissive.setHex(0xD2A679); // Warm tan glow
+                // Make emissive intensity stronger
+                if (hoveredMesh.material.emissiveIntensity !== undefined) {
+                  hoveredMesh.material.emissiveIntensity = 0.5;
+                }
+              }
+              
+              // Force material update
+              hoveredMesh.material.needsUpdate = true;
             }
             
-            console.log('✨ Hovering:', hoveredMesh.name, `(screen ${(screenPercent * 100).toFixed(0)}%)`);
+            console.log('✨ GLOWING:', hoveredMesh.name);
             modelViewer.style.cursor = 'pointer';
           }
         });
@@ -218,19 +222,19 @@
         // Mouse leave
         modelViewer.addEventListener('mouseleave', () => {
           if (hoveredMesh) {
-            console.log('👋 Resetting hover');
+            console.log('👋 Resetting to gray');
             resetMesh(hoveredMesh);
             hoveredMesh = null;
             modelViewer.style.cursor = 'default';
           }
         });
         
-        console.log('✅ Simple hover enabled!');
+        console.log('✅ Bright hover enabled - should be very visible!');
       }
       
       function resetMesh(mesh) {
         const original = originalMaterials.get(mesh);
-        if (original) {
+        if (original && mesh.material) {
           if (original.color && mesh.material.color) {
             mesh.material.color.copy(original.color);
           }
@@ -239,6 +243,14 @@
           } else if (mesh.material.emissive) {
             mesh.material.emissive.setRGB(0, 0, 0);
           }
+          
+          // Reset emissive intensity
+          if (mesh.material.emissiveIntensity !== undefined) {
+            mesh.material.emissiveIntensity = 1.0;
+          }
+          
+          // Force update
+          mesh.material.needsUpdate = true;
         }
       }
     </script>
